@@ -6,7 +6,7 @@ from fastapi.responses import PlainTextResponse
 
 app = FastAPI()
 app.title="Rabobank"                                                         
-con = duckdb.connect("./database/records.db", read_only = True)
+con = duckdb.connect("./database/records.db", read_only=True)
 
 @app.get("/records/invalid", response_class=PlainTextResponse)
 def get_invalid_records():
