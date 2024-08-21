@@ -1,5 +1,5 @@
 # Rabobank Assignment
-Rabobank assignment.
+In this project, you will find my initial setup for a Rabobank assignment. The assignment can be found in `assignment/Assignment.pdf`.
 
 ## Dependencies
 - Python 3.12
@@ -11,61 +11,34 @@ Rabobank assignment received through email. In `assignment`, the assignment pdf 
 ## Project Structure
 ```shell
 .
-├── api
-├── assignment
-├── database
-├── pipeline
-├── terraform
-└── README.md
+├── api/                                # a simple FastAPI solution
+├── assignment/                         # the original assignment
+├── azurite/                            # initialisation of Azurite blobs
+├── notebooks/                          # Spark notebook for running validation checks
+├── postgresql/                         # initialisation of PostgreSQL tables
+├── terraform/                          # Terraform code for deploying Azure resources
+├── docker-compose.yml
+├── Makefile
+├── README.md
+└── requirements.txt
 ```
 
-### Api
-The `api` directory contains a simple API created with [FastAPI](https://fastapi.tiangolo.com) to retrieve failed records from the database.
+## Project Setup
+Due to Azure Sandbox limitations this project contains local deployments for storage solutions, such as Azurite and Postgresql. Furthermore, it contains a notebook to run the PySpark commands and an API for retrieving the failed records.
 
-#### Usage
+To setup the initial project run:
 ```
-pip install "fastapi[standard]"
-pip install duckdb
-pip install tabulate
+make setup
+make validate
+```
 
-fastapi dev /api/main.py
-```
+This will install the `requirements.txt` file and run Azurite, PostgreSQL and the [FastAPI](https://fastapi.tiangolo.com) found in the Docker Compose file. Afterwards, the Jupyter Notebook can be executed to insert the `records 1.csv` into the Postgres tables. Finally, the invalid records can be retrieved using the API.
 
 Go to `http://127.0.0.1:8000/docs` to see the API spec. Or retrieve the invalid records from `http://127.0.0.1:8000/records/invalid`.
 
-### Assignment
-The `assignment` directory contains the original assignment received from Rabobank.
+When you're finished reviewing the records make sure to exit all processes, using `make teardown`, this will stop all containers and remove the related images.
 
-### Database
-The `database` directory contains the [DuckDB](https://duckdb.org) database used containg two tables `validated_records` and `invalid_records`.
-
-`validated_records` schema
-| column         | type                  |
-|----------------|-----------------------|
-| reference      | INTEGER (PRIMARY KEY) |
-| account_number | VARCHAR               |
-| description    | VARCHAR               |
-| start_balance  | FLOAT                 |
-| mutation       | FLOAT                 |
-| end_balance    | FLOAT                 |
-
-`invalid_records` schema
-| column         | type    |
-|----------------|---------|
-| reference      | INTEGER |
-| account_number | VARCHAR |
-| description    | VARCHAR |
-| start_balance  | FLOAT   |
-| mutation       | FLOAT   |
-| end_balance    | FLOAT   |
-
-### Pipeline
-The `pipeline` directory contains two Jupyter Notebooks. `init_duckdb.ipynb` initialises a `records.db` found in `database` directory. `validated_records.ipynb` contains the PySpark code where the validations are done on the `records 1.csv` file.
-
-### Terraform
-The `terraform` directory contains the Terraform code to deploy the following Azure Resources: Azure Key Vault, Azure Storage Account, Azure SQL Database and Azure Synapse Analytics.
-
-## Plan of Attack
+## Initial Plan
 1. Create infrastructure using Terraform
     - Deploy Storage Account, Azure SQL Server and Azure Synapse (with Spark Pool)
     - Deploy extra/optional Azure Key Vault for storing admin passwords
@@ -89,24 +62,25 @@ The `terraform` directory contains the Terraform code to deploy the following Az
 6. Create simple API to retrieve failed records from database
 
 ## Limitations and Considerations
+In the end I was not able to follow through on the initial plan due to some limitations of the Azure Sandbox that I have used. In the following section I will go through each implementation I have done for some explanation and further development.
 
 ### Api
 - Super simple API created with FastAPI with one endpoint. Could add parameters for limited number of invalid records received. Or query parameters based on reference number.
-
-- Could have created some setup instead of separate `pip install` rows using Poetry.
 
 - To run the FastAPI or any kind of API to retrieve records from a database, I would compare any of the following solutions: https://learn.microsoft.com/en-us/azure/container-apps/compare-options. My preference would go to Kubernetes, seeing as it is a cloud agnostic framework for orchestrating containerized workloads, but if the team wants to have less maintenance, I would consider a PoC with either Azure Functions or Azure Container Apps.
 
 - It was my first experience using FastAPI, it was very easy to setup an initial API, however I am unsure whether it is suitable for production usecases.
 
-### Pipeline
-- In the end, I did not use an Azure Synapse Pipeline to do the validations, therefore I used Jupyter Notebooks (with Spark configured) and DuckDB to perform the necessary actions to simulate database upserts.
+- Could have done multi-stage building for FastAPI to create slimmer image.
 
-- Unable to use [ON CONFLICT](https://duckdb.org/docs/sql/statements/insert.html#on-conflict-clause) properly to insert rows into a different table. Unfortunately, DuckDB does not allow triggers (unlike PostgreSQL).
+### Notebook
+- In the end, I did not use an Azure Synapse Pipeline to do the validations, therefore I used Jupyter Notebooks (with Spark configured) and DuckDB to perform the necessary actions to simulate database upserts.
 
 - I would consider adding a [Storage Event trigger](https://learn.microsoft.com/en-us/azure/data-factory/how-to-create-event-trigger?tabs=data-factory) to the pipeline. Furthermore, regarding pipeline definitions and notebooks I would store these in a Git repository, giving the possibility for CI/CD.
 
-- It was my first time using DuckDB to create a quick database instance to perform SQL operations. It is quite fast for these small usecases. DuckDB offers various [extensions](https://duckdb.org/docs/extensions/overview) which makes it easy to connect to different databases.
+- Connection to Azurite from local Spark configuration seems more complex than initially thought, therefore I opted for using the csv file as is. Although this will be easier when using a Spark notebook in Azure Synapse as the Spark configuration has been set properly.
+
+- Spark writes with JDBC are limited, have to manually write up inserts with constraints, such as primary keys.
 
 ### Terraform
 - Due to limited permissions on A Cloud Guru Azure Sandbox environment I was unable to perform the following actions:
